@@ -1,0 +1,27 @@
+[build-system]
+requires = ["hatchling>=1.21"]
+build-backend = "hatchling.build"
+
+[project]
+name = "veilroute"
+version = "0.1.0"
+description = "PII-aware local/cloud model router with transparent redaction."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Veilroute contributors" }]
+dependencies = [
+  "numpy>=1.24",
+  "onnxruntime>=1.17",
+  "openai>=1.40",
+  "tokenizers>=0.15",
+]
+
+[project.optional-dependencies]
+foundry = ["foundry-local-sdk>=0.3"]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23"]
+benchmarks = ["pandas>=2.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
