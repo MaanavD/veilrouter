@@ -6,6 +6,8 @@ from typing import Any
 
 from veilroute.errors import ScoreParseError
 
+_THINK_RE = re.compile(r"<think>.*?</think>", re.IGNORECASE | re.DOTALL)
+_SCORE_FIELD_RE = re.compile(r'"score"\s*:\s*"?(-?\d+)"?', re.IGNORECASE)
 _SCORE_RE = re.compile(r"\b([0-5])\b")
 
 
@@ -17,8 +19,10 @@ def parse_score(output: str, *, default: int | None = 2) -> int:
             raise ScoreParseError("empty score output")
         return _clamp(default)
 
+    cleaned = _strip_thinking(text)
+
     try:
-        parsed: Any = json.loads(text)
+        parsed: Any = json.loads(cleaned)
     except json.JSONDecodeError:
         parsed = None
 
@@ -30,7 +34,11 @@ def parse_score(output: str, *, default: int | None = 2) -> int:
     elif isinstance(parsed, int):
         return _clamp(parsed)
 
-    match = _SCORE_RE.search(text)
+    field_match = _SCORE_FIELD_RE.search(cleaned)
+    if field_match:
+        return _clamp(int(field_match.group(1)))
+
+    match = _SCORE_RE.search(cleaned)
     if match:
         return _clamp(int(match.group(1)))
     if default is None:
@@ -40,3 +48,8 @@ def parse_score(output: str, *, default: int | None = 2) -> int:
 
 def _clamp(value: int) -> int:
     return max(0, min(5, int(value)))
+
+
+def _strip_thinking(text: str) -> str:
+    stripped = _THINK_RE.sub("", text).strip()
+    return stripped or text

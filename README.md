@@ -9,7 +9,7 @@ from veilroute import Router, RouterConfig
 
 router = Router(RouterConfig(
     local_model="qwen2.5-0.5b",
-    scorer_model="qwen2.5-0.5b",
+    scorer_model="phi-3.5-mini",
     cloud_endpoint="https://example.openai.azure.com/openai/v1",
     cloud_api_key="...",
     cloud_model="gpt-4o",
@@ -53,3 +53,24 @@ python benchmarks\benchmark_core.py --mode stream --iterations 25 --format json
 The harness uses deterministic fake local/cloud providers, a heuristic scorer,
 and the regex PII detector. It does not require live provider credentials,
 Foundry Local, model downloads, or network access.
+
+## Foundry Local scorer evaluation
+
+Evaluate candidate local scorer models against the labeled 0-5 difficulty
+dataset:
+
+```powershell
+python benchmarks\benchmark_scorer_models.py qwen3-0.6b qwen2.5-0.5b qwen2.5-1.5b qwen3-1.7b phi-3.5-mini phi-4-mini smollm3-3b --temperature 0 --max-tokens 256 --format text
+python benchmarks\benchmark_scorer_models.py phi-3.5-mini --temperature 0 --max-tokens 256 --format json
+```
+
+The scorer benchmark uses `FoundryLocalProvider` and the same scoring rubric as
+`LlmDifficultyScorer`. It reports exact accuracy, within-1 accuracy,
+local-vs-cloud route accuracy for the default `local_score_max=1`, parse
+failures, and latency, then ranks candidates. It is safe to run locally and does
+not require network access when the candidate Foundry Local models are already
+available.
+
+In the current local evaluation, `phi-3.5-mini` ranked best for difficulty
+scoring with 100% local-vs-cloud route accuracy, 66.67% exact score accuracy,
+94.44% within-1 accuracy, and no parse failures across 18 labeled prompts.

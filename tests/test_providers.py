@@ -1,9 +1,12 @@
 import asyncio
+import importlib
+import sys
 from types import SimpleNamespace
 
 import pytest
 
 from veilroute.errors import ConfigurationError, ProviderCallError, ProviderSetupError
+import veilroute.providers.foundry_local as foundry_local_module
 from veilroute.providers.foundry_local import FoundryLocalProvider
 from veilroute.providers.openai_compatible import OpenAICompatibleProvider
 
@@ -124,6 +127,227 @@ def test_foundry_local_complete_maps_openai_shaped_client_without_sdk():
     assert response.tokens_out == 3
     assert create.calls[0]["model"] == "local-test"
     assert create.calls[0]["top_p"] == 0.9
+
+
+@pytest.mark.parametrize(
+    ("sdk_response", "expected_text"),
+    [
+        ("plain sdk answer", "plain sdk answer"),
+        (SimpleNamespace(text="text sdk answer"), "text sdk answer"),
+        (SimpleNamespace(content="content sdk answer"), "content sdk answer"),
+        (SimpleNamespace(message=SimpleNamespace(content="message sdk answer")), "message sdk answer"),
+        (
+            SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        message=SimpleNamespace(content="choice sdk answer"),
+                    )
+                ]
+            ),
+            "choice sdk answer",
+        ),
+    ],
+)
+def test_foundry_local_complete_maps_foundry_sdk_chat_client_shapes(sdk_response, expected_text):
+    class SdkChatClient:
+        def __init__(self):
+            self.settings = SimpleNamespace(temperature=None, max_tokens=None)
+            self.calls = []
+
+        def complete_chat(self, messages):
+            self.calls.append(messages)
+            return sdk_response
+
+    client = SdkChatClient()
+    provider = FoundryLocalProvider(model="local-test")
+    provider._client = client
+
+    response = provider.complete([{"role": "user", "content": "hello"}], temperature=0, max_tokens=8)
+
+    assert response.text == expected_text
+    assert client.calls == [[{"role": "user", "content": "hello"}]]
+    assert client.settings.temperature == 0
+    assert client.settings.max_tokens == 8
+
+
+def test_foundry_local_uses_installed_foundry_local_sdk_when_legacy_import_missing(monkeypatch):
+    class Configuration:
+        def __init__(self, *, app_name):
+            self.app_name = app_name
+
+    class FakeChatClient:
+        def __init__(self):
+            self.settings = SimpleNamespace(temperature=None, max_tokens=None)
+            self.calls = []
+
+        def complete_chat(self, messages):
+            self.calls.append(messages)
+            return SimpleNamespace(message=SimpleNamespace(content="sdk answer"))
+
+    class FakeModel:
+        def __init__(self):
+            self.downloads = 0
+            self.loads = 0
+            self.client = FakeChatClient()
+
+        def download(self):
+            self.downloads += 1
+
+        def load(self):
+            self.loads += 1
+
+        def get_chat_client(self):
+            return self.client
+
+    class FakeCatalog:
+        def __init__(self, model):
+            self.model = model
+            self.requested = []
+
+        def get_model(self, name):
+            self.requested.append(name)
+            return self.model
+
+    model = FakeModel()
+    manager = SimpleNamespace(catalog=FakeCatalog(model))
+
+    class FakeFoundryLocalManager:
+        instance = manager
+        initialized_with = []
+
+        @classmethod
+        def initialize(cls, config):
+            cls.initialized_with.append(config)
+
+    monkeypatch.setitem(
+        sys.modules,
+        "foundry_local_sdk",
+        SimpleNamespace(Configuration=Configuration, FoundryLocalManager=FakeFoundryLocalManager),
+    )
+    monkeypatch.setitem(sys.modules, "foundry_local", None)
+
+    provider = FoundryLocalProvider(model="qwen3-0.6b")
+
+    assert model.downloads == 0
+    assert model.loads == 0
+
+    response = provider.complete([{"role": "user", "content": "hello"}], temperature=0, max_tokens=8)
+
+    assert response.text == "sdk answer"
+    assert FakeFoundryLocalManager.initialized_with[0].app_name == "veilroute"
+    assert manager.catalog.requested == ["qwen3-0.6b"]
+    assert model.downloads == 1
+    assert model.loads == 1
+    assert model.client.settings.temperature == 0
+    assert model.client.settings.max_tokens == 8
+
+
+def test_foundry_local_sdk_reuses_existing_singleton(monkeypatch):
+    class Configuration:
+        def __init__(self, *, app_name):
+            self.app_name = app_name
+
+    class FakeChatClient:
+        def __init__(self, text):
+            self.text = text
+            self.settings = SimpleNamespace()
+
+        def complete_chat(self, messages):
+            return self.text
+
+    class FakeModel:
+        def __init__(self, name):
+            self.name = name
+
+        def download(self):
+            pass
+
+        def load(self):
+            pass
+
+        def get_chat_client(self):
+            return FakeChatClient(f"answer from {self.name}")
+
+    class FakeCatalog:
+        def get_model(self, name):
+            return FakeModel(name)
+
+    manager = SimpleNamespace(catalog=FakeCatalog())
+
+    class FakeFoundryLocalManager:
+        instance = manager
+        initialize_calls = 0
+
+        @classmethod
+        def initialize(cls, config):
+            cls.initialize_calls += 1
+            if cls.initialize_calls > 1:
+                raise RuntimeError("FoundryLocalManager is a singleton and has already been initialized.")
+
+    monkeypatch.setitem(
+        sys.modules,
+        "foundry_local_sdk",
+        SimpleNamespace(Configuration=Configuration, FoundryLocalManager=FakeFoundryLocalManager),
+    )
+    monkeypatch.setitem(sys.modules, "foundry_local", None)
+
+    first = FoundryLocalProvider(model="model-a").complete([{"role": "user", "content": "hello"}])
+    second = FoundryLocalProvider(model="model-b").complete([{"role": "user", "content": "hello"}])
+
+    assert first.text == "answer from model-a"
+    assert second.text == "answer from model-b"
+
+
+def test_foundry_local_preserves_legacy_foundry_local_fallback(monkeypatch):
+    class LegacyChatClient:
+        def __init__(self):
+            self.calls = []
+
+        def complete(self, **kwargs):
+            self.calls.append(kwargs)
+            return SimpleNamespace(text=f"legacy answer from {kwargs['model']}")
+
+    class LegacyManager:
+        instances = []
+
+        def __init__(self, *args):
+            self.args = args
+            self.downloaded = []
+            self.loaded = []
+            self.client = LegacyChatClient()
+            LegacyManager.instances.append(self)
+
+        def download_model(self, model):
+            self.downloaded.append(model)
+
+        def load_model(self, model):
+            self.loaded.append(model)
+
+        def get_chat_client(self, *args):
+            self.chat_client_args = args
+            return self.client
+
+    original_import_module = importlib.import_module
+
+    def fake_import_module(name, package=None):
+        if name == "foundry_local_sdk":
+            raise ImportError("not installed")
+        if name == "foundry_local":
+            return SimpleNamespace(FoundryLocalManager=LegacyManager)
+        return original_import_module(name, package)
+
+    monkeypatch.setattr(foundry_local_module.importlib, "import_module", fake_import_module)
+
+    provider = FoundryLocalProvider(model="legacy-local")
+    response = provider.complete([{"role": "user", "content": "hello"}], top_p=0.9)
+
+    manager = LegacyManager.instances[0]
+    assert response.text == "legacy answer from legacy-local"
+    assert manager.args == ("legacy-local",)
+    assert manager.downloaded == ["legacy-local"]
+    assert manager.loaded == ["legacy-local"]
+    assert manager.chat_client_args == ("legacy-local",)
+    assert manager.client.calls[0]["top_p"] == 0.9
 
 
 def test_foundry_local_stream_uses_streaming_client_when_available():

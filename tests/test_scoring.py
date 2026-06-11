@@ -15,6 +15,8 @@ from veilroute.scoring.parsing import parse_score
         ('{"score": 3}', 3),
         ('{"score": 9}', 5),
         ("difficulty score: 1 because it is factual", 1),
+        ('<think>I considered score 5 but changed my mind.</think>\n{"score": 0}', 0),
+        ("Some explanation before JSON: {\"score\": 4}", 4),
         ("", 2),
         ("not a score", 2),
     ],

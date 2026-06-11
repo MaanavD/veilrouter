@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import importlib
 from typing import Any, AsyncIterator, Iterator
 
 from veilroute.errors import ProviderCallError, ProviderSetupError
@@ -11,34 +12,70 @@ class FoundryLocalProvider:
     def __init__(self, *, model: str) -> None:
         self.model = model
         self._manager: Any | None = None
+        self._model_handle: Any | None = None
         self._client: Any | None = None
+        self._sdk_name: str | None = None
 
     def _ensure_client(self) -> Any:
         if self._client is not None:
             return self._client
         try:
-            from foundry_local import FoundryLocalManager
-        except ImportError as exc:
-            raise ProviderSetupError(
-                "Foundry Local SDK is required for local routing. Install veilroute[foundry]."
-            ) from exc
-
-        errors: list[Exception] = []
-        for args in ((self.model,), ()):
-            try:
-                self._manager = FoundryLocalManager(*args)
-                break
-            except Exception as exc:
-                errors.append(exc)
-        if self._manager is None:
-            raise ProviderSetupError(f"could not initialize FoundryLocalManager: {errors[-1]}") from errors[-1]
-
-        try:
+            self._manager = self._initialize_manager()
             self._load_model_if_supported()
             self._client = self._get_chat_client()
             return self._client
+        except ProviderSetupError:
+            raise
         except Exception as exc:
             raise ProviderSetupError(f"could not initialize Foundry Local chat client: {exc}") from exc
+
+    def _initialize_manager(self) -> Any:
+        try:
+            return self._initialize_foundry_local_sdk()
+        except ImportError:
+            pass
+        try:
+            return self._initialize_legacy_foundry_local()
+        except ImportError as legacy_exc:
+            raise ProviderSetupError(
+                "Foundry Local SDK is required for local routing. Install veilroute[foundry]."
+            ) from legacy_exc
+
+    def _initialize_foundry_local_sdk(self) -> Any:
+        module = importlib.import_module("foundry_local_sdk")
+        configuration = getattr(module, "Configuration", None)
+        manager_cls = getattr(module, "FoundryLocalManager", None)
+        if configuration is None or manager_cls is None:
+            raise ProviderSetupError("foundry_local_sdk does not expose Configuration and FoundryLocalManager")
+
+        initialize = getattr(manager_cls, "initialize", None)
+        if initialize is not None:
+            try:
+                initialize(configuration(app_name="veilroute"))
+            except Exception as exc:
+                if "singleton" not in str(exc).lower() and "already been initialized" not in str(exc).lower():
+                    raise
+
+        manager = getattr(manager_cls, "instance", None)
+        if callable(manager):
+            manager = manager()
+        if manager is None:
+            manager = manager_cls()
+        self._sdk_name = "foundry_local_sdk"
+        return manager
+
+    def _initialize_legacy_foundry_local(self) -> Any:
+        module = importlib.import_module("foundry_local")
+        manager_cls = getattr(module, "FoundryLocalManager")
+        errors: list[Exception] = []
+        for args in ((self.model,), ()):
+            try:
+                manager = manager_cls(*args)
+                self._sdk_name = "foundry_local"
+                return manager
+            except Exception as exc:
+                errors.append(exc)
+        raise ProviderSetupError(f"could not initialize FoundryLocalManager: {errors[-1]}") from errors[-1]
 
     def _load_model_if_supported(self) -> None:
         manager = self._manager
@@ -46,6 +83,21 @@ class FoundryLocalProvider:
         model_info = None
         if catalog is not None and hasattr(catalog, "get_model"):
             model_info = catalog.get_model(self.model)
+        self._model_handle = model_info
+
+        if model_info is not None and self._sdk_name == "foundry_local_sdk":
+            for name in ("download", "download_model"):
+                method = getattr(model_info, name, None)
+                if method is not None:
+                    method()
+                    break
+            for name in ("load", "load_model"):
+                method = getattr(model_info, name, None)
+                if method is not None:
+                    method()
+                    break
+            return
+
         for name in ("download_model", "download"):
             method = getattr(manager, name, None)
             if method is not None:
@@ -59,6 +111,11 @@ class FoundryLocalProvider:
 
     def _get_chat_client(self) -> Any:
         manager = self._manager
+        model_handle = self._model_handle
+        if model_handle is not None:
+            method = getattr(model_handle, "get_chat_client", None)
+            if method is not None:
+                return method()
         method = getattr(manager, "get_chat_client", None)
         if method is None:
             raise ProviderSetupError("FoundryLocalManager does not expose get_chat_client()")
@@ -82,9 +139,14 @@ class FoundryLocalProvider:
                     tokens_out=getattr(usage, "completion_tokens", None),
                     raw=response,
                 )
+            if hasattr(client, "complete_chat"):
+                _apply_client_settings(client, opts)
+                response = client.complete_chat(messages)
+                text = _extract_response_text(response)
+                return ChatResponse(text=text, model=self.model, raw=response)
             if hasattr(client, "complete"):
                 response = client.complete(messages=messages, model=self.model, **opts)
-                text = getattr(response, "text", response if isinstance(response, str) else "")
+                text = _extract_response_text(response)
                 return ChatResponse(text=text, model=self.model, raw=response)
         except Exception as exc:
             raise ProviderCallError(f"Foundry Local call failed: {exc}") from exc
@@ -116,3 +178,47 @@ class FoundryLocalProvider:
     async def astream(self, messages: list[Message], **opts: Any) -> AsyncIterator[ChatChunk]:
         for chunk in await asyncio.to_thread(lambda: list(self.stream(messages, **opts))):
             yield chunk
+
+
+def _apply_client_settings(client: Any, opts: dict[str, Any]) -> None:
+    settings = getattr(client, "settings", None)
+    if settings is None:
+        return
+    for key, value in opts.items():
+        if hasattr(settings, key):
+            setattr(settings, key, value)
+
+
+def _extract_response_text(response: Any) -> str:
+    if isinstance(response, str):
+        return response
+    if isinstance(response, dict):
+        choices = response.get("choices")
+        if choices:
+            text = _extract_response_text(choices[0])
+            if text:
+                return text
+        for key in ("text", "content", "message", "output_text"):
+            value = response.get(key)
+            text = _extract_response_text(value) if value is not None and key == "message" else value
+            if isinstance(text, str):
+                return text
+        return ""
+    choices = getattr(response, "choices", None)
+    if choices:
+        text = _extract_response_text(choices[0])
+        if text:
+            return text
+    for attr in ("text", "content", "output_text"):
+        value = getattr(response, attr, None)
+        if isinstance(value, str):
+            return value
+    message = getattr(response, "message", None)
+    if message is not None:
+        text = _extract_response_text(message)
+        if text:
+            return text
+    delta = getattr(response, "delta", None)
+    if delta is not None:
+        return _extract_response_text(delta)
+    return ""

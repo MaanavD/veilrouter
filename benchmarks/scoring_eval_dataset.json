@@ -1,0 +1,128 @@
+[
+  {
+    "id": "score0-greeting",
+    "prompt": "Hi!",
+    "expected_score": 0,
+    "contains_pii": false,
+    "tags": ["trivial", "no-pii", "local"]
+  },
+  {
+    "id": "score0-thanks",
+    "prompt": "Thanks, that's all I needed.",
+    "expected_score": 0,
+    "contains_pii": false,
+    "tags": ["trivial", "no-pii", "local"]
+  },
+  {
+    "id": "score0-tiny-format",
+    "prompt": "Reply with the word OK.",
+    "expected_score": 0,
+    "contains_pii": false,
+    "tags": ["trivial", "no-pii", "local"]
+  },
+  {
+    "id": "score1-factual",
+    "prompt": "What port does HTTPS normally use?",
+    "expected_score": 1,
+    "contains_pii": false,
+    "tags": ["simple-factual", "no-pii", "local"]
+  },
+  {
+    "id": "score1-pii-simple",
+    "prompt": "Format this phone number with dashes: 4255550199.",
+    "expected_score": 1,
+    "contains_pii": true,
+    "tags": ["simple-transform", "pii", "local"]
+  },
+  {
+    "id": "score1-short-summary",
+    "prompt": "Summarize this in five words: The deployment finished successfully.",
+    "expected_score": 1,
+    "contains_pii": false,
+    "tags": ["simple-summary", "no-pii", "local"]
+  },
+  {
+    "id": "score2-moderate-reasoning",
+    "prompt": "Explain why retrying idempotent HTTP requests can improve reliability but retrying non-idempotent requests can be risky.",
+    "expected_score": 2,
+    "contains_pii": false,
+    "tags": ["moderate-reasoning", "no-pii", "cloud"]
+  },
+  {
+    "id": "score2-email-tone",
+    "prompt": "Rewrite this note to sound polite and concise: Jane Doe missed the deadline and needs to send the status update today.",
+    "expected_score": 2,
+    "contains_pii": true,
+    "tags": ["rewrite", "pii", "cloud"]
+  },
+  {
+    "id": "score2-tradeoff",
+    "prompt": "Compare using a regex PII detector versus a small classifier for a local redaction backstop in two short paragraphs.",
+    "expected_score": 2,
+    "contains_pii": false,
+    "tags": ["comparison", "no-pii", "cloud"]
+  },
+  {
+    "id": "score3-structured-plan",
+    "prompt": "Create a three-step migration checklist for moving an internal API from API keys to OAuth. Include owner, validation, and rollback columns.",
+    "expected_score": 3,
+    "contains_pii": false,
+    "tags": ["structured", "multi-step", "no-pii", "cloud"]
+  },
+  {
+    "id": "score3-structured-pii",
+    "prompt": "Turn this customer escalation into a table with issue, impact, next action, and owner: Alex Lee at alex.lee@example.com cannot access invoices for account 123-45-6789.",
+    "expected_score": 3,
+    "contains_pii": true,
+    "tags": ["structured", "pii", "cloud"]
+  },
+  {
+    "id": "score3-debug-steps",
+    "prompt": "Given intermittent 502s after a gateway rollout, list likely causes, the first five diagnostics to run, and what evidence would confirm each cause.",
+    "expected_score": 3,
+    "contains_pii": false,
+    "tags": ["multi-step", "diagnostics", "no-pii", "cloud"]
+  },
+  {
+    "id": "score4-long-context",
+    "prompt": "Review this release note draft and identify contradictions, missing risks, and unclear rollout steps. Draft: Phase 1 enables the new router for all beta users, while phase 2 disables the legacy router for only ten percent of beta users. The fallback path is described as automatic, but support must manually approve failover. Telemetry will be sampled at five percent, yet the success criteria require per-request redaction counts. The launch owner is not assigned. Provide a concise risk register with mitigations.",
+    "expected_score": 4,
+    "contains_pii": false,
+    "tags": ["long", "complex-reasoning", "no-pii", "cloud"]
+  },
+  {
+    "id": "score4-architecture",
+    "prompt": "Design an architecture for a PII-aware model router that keeps simple requests local, redacts cloud-bound data, records cost savings, and degrades safely if the local scorer fails.",
+    "expected_score": 4,
+    "contains_pii": false,
+    "tags": ["architecture", "complex-reasoning", "cloud"]
+  },
+  {
+    "id": "score4-policy-pii",
+    "prompt": "Analyze whether this support transcript should be escalated to cloud processing under a strict privacy policy. Transcript: Maria Garcia shared maria.garcia@example.com, a credit card ending in 4242, and a medical appointment date while asking for account recovery help.",
+    "expected_score": 4,
+    "contains_pii": true,
+    "tags": ["policy", "pii", "complex-reasoning", "cloud"]
+  },
+  {
+    "id": "score5-high-stakes-medical",
+    "prompt": "A clinician asks for a differential diagnosis and medication dosing recommendation for a patient with chest pain, kidney disease, and a list of current prescriptions. Explain why this is high stakes and what safe next step should be recommended instead of giving dosing advice.",
+    "expected_score": 5,
+    "contains_pii": false,
+    "tags": ["high-stakes", "medical", "cloud"]
+  },
+  {
+    "id": "score5-security-incident",
+    "prompt": "You are coordinating a live security incident involving suspected credential theft, customer PII exposure, and possible data exfiltration. Build an incident command plan with containment, evidence preservation, legal notification, and executive update sections.",
+    "expected_score": 5,
+    "contains_pii": true,
+    "tags": ["high-stakes", "security", "pii", "agentic", "cloud"]
+  },
+  {
+    "id": "score5-legal-contract",
+    "prompt": "Draft a legal risk analysis for terminating a vendor contract after a data breach, including indemnification, notice obligations, regulatory reporting, and negotiation strategy. Do not assume missing facts.",
+    "expected_score": 5,
+    "contains_pii": false,
+    "tags": ["high-stakes", "legal", "expert", "cloud"]
+  }
+]
