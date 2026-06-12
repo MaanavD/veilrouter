@@ -67,10 +67,14 @@ python benchmarks\benchmark_scorer_models.py phi-3.5-mini --temperature 0 --max-
 The scorer benchmark uses `FoundryLocalProvider` and the same scoring rubric as
 `LlmDifficultyScorer`. It reports exact accuracy, within-1 accuracy,
 local-vs-cloud route accuracy for the default `local_score_max=1`, parse
-failures, and latency, then ranks candidates. It is safe to run locally and does
-not require network access when the candidate Foundry Local models are already
-available.
+failures, setup/load latency, per-prompt inference latency, and speed penalties,
+then ranks candidates. The rank score weights route accuracy most heavily while
+also rewarding exact/near-exact scores and penalizing parse failures, runtime
+errors, model load time, and p95 inference latency. It is safe to run locally and
+does not require network access when the candidate Foundry Local models are
+already available.
 
-In the current local evaluation, `phi-3.5-mini` ranked best for difficulty
-scoring with 100% local-vs-cloud route accuracy, 66.67% exact score accuracy,
-94.44% within-1 accuracy, and no parse failures across 18 labeled prompts.
+In the current 36-prompt local evaluation, `phi-3.5-mini` ranked best for
+difficulty scoring after load/inference speed penalties: 100% local-vs-cloud
+route accuracy, 52.78% exact score accuracy, 91.67% within-1 accuracy, 2.78%
+parse failures, 7.95s setup/load latency, and 30.93s p95 inference latency.

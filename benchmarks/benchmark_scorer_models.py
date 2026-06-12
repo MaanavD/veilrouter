@@ -19,6 +19,17 @@ from veilroute.scoring.llm_scorer import _RUBRIC  # noqa: E402
 from veilroute.scoring.parsing import parse_score  # noqa: E402
 
 DEFAULT_DATASET = Path(__file__).with_name("scoring_eval_dataset.json")
+MAX_INFERENCE_SPEED_PENALTY = 0.10
+MAX_LOAD_SPEED_PENALTY = 0.10
+INFERENCE_P95_PENALTY_MS = 60_000.0
+LOAD_PENALTY_MS = 180_000.0
+
+
+@dataclass(frozen=True, slots=True)
+class ScorerCandidate:
+    score: Callable[[str], tuple[int, bool, str | None]]
+    setup_latency_ms: float
+    setup_error: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -86,13 +97,21 @@ def validate_dataset_coverage(examples: Iterable[ScoringExample]) -> dict[str, b
     examples = list(examples)
     scores = {example.expected_score for example in examples}
     tags = {tag for example in examples for tag in example.tags}
+    counts_by_score = {score: 0 for score in range(6)}
+    for example in examples:
+        counts_by_score[example.expected_score] += 1
     return {
         "scores_0_to_5": scores == set(range(6)),
+        "at_least_five_per_score": all(count >= 5 for count in counts_by_score.values()),
         "pii_and_no_pii": any(example.contains_pii for example in examples)
         and any(not example.contains_pii for example in examples),
         "long_prompt": any("long" in example.tags or len(example.prompt) > 350 for example in examples),
         "structured_prompt": any("structured" in example.tags or "multi-step" in example.tags for example in examples),
         "high_stakes_prompt": "high-stakes" in tags,
+        "coding_prompt": "coding" in tags,
+        "support_prompt": "support" in tags,
+        "ambiguous_prompt": "ambiguous" in tags,
+        "security_prompt": "security" in tags,
     }
 
 
@@ -113,6 +132,8 @@ def summarize_predictions(
     predictions: list[Prediction],
     *,
     local_score_max: int = 1,
+    setup_latency_ms: float = 0.0,
+    setup_error: str | None = None,
 ) -> dict[str, Any]:
     total = len(predictions)
     exact = 0
@@ -139,14 +160,19 @@ def summarize_predictions(
     within_1_accuracy = within_1 / total if total else 0.0
     route_accuracy = route_matches / total if total else 0.0
     parse_failure_rate = parse_failures / total if total else 0.0
+    error_rate = errors / total if total else 0.0
     latency_avg = sum(latencies) / total if total else 0.0
     latency_p95 = percentile(latencies, 95)
+    inference_penalty = min(latency_p95 / INFERENCE_P95_PENALTY_MS, MAX_INFERENCE_SPEED_PENALTY)
+    load_penalty = min(setup_latency_ms / LOAD_PENALTY_MS, MAX_LOAD_SPEED_PENALTY)
     rank_score = (
-        route_accuracy * 0.45
-        + exact_accuracy * 0.30
+        route_accuracy * 0.40
+        + exact_accuracy * 0.25
         + within_1_accuracy * 0.20
         - parse_failure_rate * 0.05
-        - min(latency_p95 / 10000.0, 0.05)
+        - error_rate * 0.10
+        - inference_penalty
+        - load_penalty
     )
 
     return {
@@ -158,11 +184,18 @@ def summarize_predictions(
         "parse_failures": parse_failures,
         "parse_failure_rate": round(parse_failure_rate, 4),
         "errors": errors,
+        "error_rate": round(error_rate, 4),
+        "setup_latency_ms": round(setup_latency_ms, 3),
+        "setup_error": setup_error,
         "latency_ms": {
             "avg": round(latency_avg, 3),
             "p50": round(percentile(latencies, 50), 3),
             "p95": round(latency_p95, 3),
             "max": round(max(latencies), 3) if latencies else 0.0,
+        },
+        "speed_penalty": {
+            "load": round(load_penalty, 6),
+            "inference": round(inference_penalty, 6),
         },
         "rank_score": round(rank_score, 6),
     }
@@ -177,14 +210,31 @@ def rank_summaries(summaries: list[dict[str, Any]]) -> list[dict[str, Any]]:
             item["exact_accuracy"],
             item["within_1_accuracy"],
             -item["parse_failures"],
+            -item["errors"],
+            -item["setup_latency_ms"],
             -item["latency_ms"]["p95"],
         ),
         reverse=True,
     )
 
 
-def make_foundry_scorer(model: str, *, temperature: float, max_tokens: int) -> Callable[[str], tuple[int, bool, str | None]]:
+def make_foundry_scorer(model: str, *, temperature: float, max_tokens: int) -> ScorerCandidate:
+    started = time.perf_counter()
     provider = FoundryLocalProvider(model=model)
+
+    try:
+        provider._ensure_client()
+        setup_error = None
+    except Exception as exc:
+        setup_latency_ms = (time.perf_counter() - started) * 1000
+        error = str(exc)
+
+        def raise_setup_error(prompt: str) -> tuple[int, bool, str | None]:
+            raise RuntimeError(error)
+
+        return ScorerCandidate(raise_setup_error, setup_latency_ms, error)
+
+    setup_latency_ms = (time.perf_counter() - started) * 1000
 
     def score(prompt: str) -> tuple[int, bool, str | None]:
         response = provider.complete(
@@ -200,7 +250,7 @@ def make_foundry_scorer(model: str, *, temperature: float, max_tokens: int) -> C
         except ScoreParseError:
             return parse_score(response.text, default=2), True, response.text
 
-    return score
+    return ScorerCandidate(score, setup_latency_ms, setup_error)
 
 
 def run_model(
@@ -211,12 +261,12 @@ def run_model(
     temperature: float,
     max_tokens: int,
 ) -> dict[str, Any]:
-    score_prompt = make_foundry_scorer(model, temperature=temperature, max_tokens=max_tokens)
+    scorer = make_foundry_scorer(model, temperature=temperature, max_tokens=max_tokens)
     predictions: list[Prediction] = []
     for example in examples:
         started = time.perf_counter()
         try:
-            predicted_score, parse_failed, raw_error = score_prompt(example.prompt)
+            predicted_score, parse_failed, raw_error = scorer.score(example.prompt)
             error = None
         except Exception as exc:
             predicted_score = 2
@@ -234,7 +284,13 @@ def run_model(
             )
         )
 
-    summary = summarize_predictions(model, predictions, local_score_max=local_score_max)
+    summary = summarize_predictions(
+        model,
+        predictions,
+        local_score_max=local_score_max,
+        setup_latency_ms=scorer.setup_latency_ms,
+        setup_error=scorer.setup_error,
+    )
     summary["predictions"] = [
         {
             "id": prediction.example_id,
@@ -261,10 +317,13 @@ def print_text(results: dict[str, Any]) -> None:
             f"{index}. {summary['model']} rank={summary['rank_score']} "
             f"route={summary['route_accuracy']:.2%} exact={summary['exact_accuracy']:.2%} "
             f"within1={summary['within_1_accuracy']:.2%} parse_failures={summary['parse_failures']} "
-            f"latency_ms avg={latency['avg']} p95={latency['p95']}"
+            f"load_ms={summary['setup_latency_ms']} "
+            f"inference_ms avg={latency['avg']} p95={latency['p95']}"
         )
         if summary["errors"]:
             print(f"   errors={summary['errors']} (see JSON output for details)")
+        if summary["setup_error"]:
+            print(f"   setup_error={summary['setup_error']}")
 
 
 def parse_args() -> argparse.Namespace:

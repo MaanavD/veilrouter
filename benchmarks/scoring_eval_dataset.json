@@ -21,6 +21,27 @@
     "tags": ["trivial", "no-pii", "local"]
   },
   {
+    "id": "score0-acknowledge",
+    "prompt": "Acknowledge receipt.",
+    "expected_score": 0,
+    "contains_pii": false,
+    "tags": ["trivial", "no-pii", "local", "support"]
+  },
+  {
+    "id": "score0-yes-no",
+    "prompt": "Answer yes.",
+    "expected_score": 0,
+    "contains_pii": false,
+    "tags": ["trivial", "no-pii", "local"]
+  },
+  {
+    "id": "score0-casual",
+    "prompt": "What's up?",
+    "expected_score": 0,
+    "contains_pii": false,
+    "tags": ["trivial", "ambiguous", "no-pii", "local"]
+  },
+  {
     "id": "score1-factual",
     "prompt": "What port does HTTPS normally use?",
     "expected_score": 1,
@@ -40,6 +61,27 @@
     "expected_score": 1,
     "contains_pii": false,
     "tags": ["simple-summary", "no-pii", "local"]
+  },
+  {
+    "id": "score1-acronym",
+    "prompt": "What does CPU stand for?",
+    "expected_score": 1,
+    "contains_pii": false,
+    "tags": ["simple-factual", "no-pii", "local"]
+  },
+  {
+    "id": "score1-timezone",
+    "prompt": "Convert 3 PM Pacific Time to UTC during standard time.",
+    "expected_score": 1,
+    "contains_pii": false,
+    "tags": ["simple-transform", "no-pii", "local"]
+  },
+  {
+    "id": "score1-sort-names",
+    "prompt": "Alphabetize these names: Sam, Alex, Priya.",
+    "expected_score": 1,
+    "contains_pii": true,
+    "tags": ["simple-transform", "pii", "local"]
   },
   {
     "id": "score2-moderate-reasoning",
@@ -63,6 +105,27 @@
     "tags": ["comparison", "no-pii", "cloud"]
   },
   {
+    "id": "score2-feature-flags",
+    "prompt": "Explain the tradeoff between feature flags and long-lived branches for a small engineering team.",
+    "expected_score": 2,
+    "contains_pii": false,
+    "tags": ["comparison", "moderate-reasoning", "no-pii", "cloud"]
+  },
+  {
+    "id": "score2-support-sentiment",
+    "prompt": "Classify this support message as calm, frustrated, or urgent and give one sentence why: I have tried resetting my password twice and still cannot sign in.",
+    "expected_score": 2,
+    "contains_pii": false,
+    "tags": ["support", "classification", "no-pii", "cloud"]
+  },
+  {
+    "id": "score2-sql-filter",
+    "prompt": "Write a SQL WHERE clause that selects active users created in the last 30 days and excludes test accounts.",
+    "expected_score": 2,
+    "contains_pii": false,
+    "tags": ["coding", "moderate-reasoning", "no-pii", "cloud"]
+  },
+  {
     "id": "score3-structured-plan",
     "prompt": "Create a three-step migration checklist for moving an internal API from API keys to OAuth. Include owner, validation, and rollback columns.",
     "expected_score": 3,
@@ -82,6 +145,27 @@
     "expected_score": 3,
     "contains_pii": false,
     "tags": ["multi-step", "diagnostics", "no-pii", "cloud"]
+  },
+  {
+    "id": "score3-python-tests",
+    "prompt": "Write a Python function that normalizes email addresses plus three pytest cases covering whitespace, case, and invalid input.",
+    "expected_score": 3,
+    "contains_pii": false,
+    "tags": ["coding", "structured", "multi-step", "no-pii", "cloud"]
+  },
+  {
+    "id": "score3-support-triage",
+    "prompt": "Create a triage plan for three support tickets: billing failed for Jane at jane@example.com, API latency doubled, and a user reports confusing onboarding copy.",
+    "expected_score": 3,
+    "contains_pii": true,
+    "tags": ["support", "structured", "pii", "cloud"]
+  },
+  {
+    "id": "score3-auth-table",
+    "prompt": "Compare API keys, OAuth client credentials, and signed JWTs in a table with security risk, operational burden, and recommended use case.",
+    "expected_score": 3,
+    "contains_pii": false,
+    "tags": ["structured", "comparison", "security", "no-pii", "cloud"]
   },
   {
     "id": "score4-long-context",
@@ -105,6 +189,27 @@
     "tags": ["policy", "pii", "complex-reasoning", "cloud"]
   },
   {
+    "id": "score4-concurrency-review",
+    "prompt": "Review this pseudocode for a race condition and propose a safer design: multiple workers read a shared retry counter, increment it after failures, and write it back without locking while also sending alerts after three failures.",
+    "expected_score": 4,
+    "contains_pii": false,
+    "tags": ["coding", "complex-reasoning", "no-pii", "cloud"]
+  },
+  {
+    "id": "score4-meeting-contradictions",
+    "prompt": "Synthesize these meeting notes into decisions, unresolved contradictions, and follow-up owners: Team A says launch is Friday, Team B says legal approval is pending, Support expects a phased rollout, and Sales promised all customers access Monday.",
+    "expected_score": 4,
+    "contains_pii": false,
+    "tags": ["long", "complex-reasoning", "structured", "no-pii", "cloud"]
+  },
+  {
+    "id": "score4-privacy-impact",
+    "prompt": "Draft a privacy impact assessment outline for adding call transcript summarization, including data retention, consent, redaction, audit logging, and failure modes.",
+    "expected_score": 4,
+    "contains_pii": false,
+    "tags": ["policy", "privacy", "complex-reasoning", "cloud"]
+  },
+  {
     "id": "score5-high-stakes-medical",
     "prompt": "A clinician asks for a differential diagnosis and medication dosing recommendation for a patient with chest pain, kidney disease, and a list of current prescriptions. Explain why this is high stakes and what safe next step should be recommended instead of giving dosing advice.",
     "expected_score": 5,
@@ -124,5 +229,26 @@
     "expected_score": 5,
     "contains_pii": false,
     "tags": ["high-stakes", "legal", "expert", "cloud"]
+  },
+  {
+    "id": "score5-database-corruption",
+    "prompt": "A production payment database may have corrupted ledger rows after a failed migration. Build a recovery and customer-impact plan covering backups, reconciliation, writes freeze, audit evidence, and executive communication.",
+    "expected_score": 5,
+    "contains_pii": false,
+    "tags": ["high-stakes", "database", "agentic", "cloud"]
+  },
+  {
+    "id": "score5-malware-containment",
+    "prompt": "Plan containment for active malware on employee laptops with suspected customer data exposure, including isolation, forensics, credential rotation, regulator notification, and safe communication.",
+    "expected_score": 5,
+    "contains_pii": true,
+    "tags": ["high-stakes", "security", "pii", "agentic", "cloud"]
+  },
+  {
+    "id": "score5-regulatory-personal-data",
+    "prompt": "Assess obligations after a processor accidentally emailed passport numbers for Ana Rivera and Chen Wei to the wrong customer, including breach notification, evidence preservation, and legal review boundaries.",
+    "expected_score": 5,
+    "contains_pii": true,
+    "tags": ["high-stakes", "legal", "pii", "privacy", "cloud"]
   }
 ]
