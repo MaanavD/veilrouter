@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import importlib
+import threading
 from typing import Any, AsyncIterator, Iterator
 
 from veilrouter.errors import ProviderCallError, ProviderSetupError
@@ -15,19 +16,23 @@ class FoundryLocalProvider:
         self._model_handle: Any | None = None
         self._client: Any | None = None
         self._sdk_name: str | None = None
+        self._client_lock = threading.Lock()
 
     def _ensure_client(self) -> Any:
         if self._client is not None:
             return self._client
-        try:
-            self._manager = self._initialize_manager()
-            self._load_model_if_supported()
-            self._client = self._get_chat_client()
-            return self._client
-        except ProviderSetupError:
-            raise
-        except Exception as exc:
-            raise ProviderSetupError(f"could not initialize Foundry Local chat client: {exc}") from exc
+        with self._client_lock:
+            if self._client is not None:
+                return self._client
+            try:
+                self._manager = self._initialize_manager()
+                self._load_model_if_supported()
+                self._client = self._get_chat_client()
+                return self._client
+            except ProviderSetupError:
+                raise
+            except Exception as exc:
+                raise ProviderSetupError(f"could not initialize Foundry Local chat client: {exc}") from exc
 
     def _initialize_manager(self) -> Any:
         try:
@@ -132,18 +137,20 @@ class FoundryLocalProvider:
             if hasattr(client, "chat") and hasattr(client.chat, "completions"):
                 response = client.chat.completions.create(model=self.model, messages=messages, **opts)
                 usage = getattr(response, "usage", None)
+                message = response.choices[0].message
                 return ChatResponse(
-                    text=response.choices[0].message.content or "",
+                    text=message.content or "",
                     model=getattr(response, "model", self.model),
                     tokens_in=getattr(usage, "prompt_tokens", None),
                     tokens_out=getattr(usage, "completion_tokens", None),
+                    tool_calls=getattr(message, "tool_calls", None),
                     raw=response,
                 )
             if hasattr(client, "complete_chat"):
                 _apply_client_settings(client, opts)
                 response = client.complete_chat(messages)
                 text = _extract_response_text(response)
-                return ChatResponse(text=text, model=self.model, raw=response)
+                return ChatResponse(text=text, model=self.model, tool_calls=_extract_tool_calls(response), raw=response)
             if hasattr(client, "complete"):
                 response = client.complete(messages=messages, model=self.model, **opts)
                 text = _extract_response_text(response)
@@ -222,3 +229,27 @@ def _extract_response_text(response: Any) -> str:
     if delta is not None:
         return _extract_response_text(delta)
     return ""
+
+
+def _extract_tool_calls(response: Any) -> Any:
+    if isinstance(response, dict):
+        tool_calls = response.get("tool_calls")
+        if tool_calls is not None:
+            return tool_calls
+        choices = response.get("choices")
+        if choices:
+            return _extract_tool_calls(choices[0])
+        message = response.get("message")
+        if message is not None:
+            return _extract_tool_calls(message)
+        return None
+    tool_calls = getattr(response, "tool_calls", None)
+    if tool_calls is not None:
+        return tool_calls
+    choices = getattr(response, "choices", None)
+    if choices:
+        return _extract_tool_calls(choices[0])
+    message = getattr(response, "message", None)
+    if message is not None:
+        return _extract_tool_calls(message)
+    return None

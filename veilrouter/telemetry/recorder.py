@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from threading import RLock
 from typing import Any
 
 
@@ -24,19 +25,23 @@ class TelemetryRecord:
 class InMemoryTelemetryRecorder:
     def __init__(self) -> None:
         self.records: list[TelemetryRecord] = []
+        self._lock = RLock()
 
     def record(self, record: TelemetryRecord) -> None:
-        self.records.append(record)
+        with self._lock:
+            self.records.append(record)
 
     def report(self) -> dict[str, Any]:
-        total = len(self.records)
-        local = sum(1 for record in self.records if record.route == "local")
+        with self._lock:
+            records = list(self.records)
+        total = len(records)
+        local = sum(1 for record in records if record.route == "local")
         return {
             "total_calls": total,
             "local_calls": local,
             "local_rate": (local / total) if total else 0.0,
-            "total_cost_saved": sum(record.cost_saved for record in self.records),
-            "total_redactions": sum(record.redaction_count for record in self.records),
+            "total_cost_saved": sum(record.cost_saved for record in records),
+            "total_redactions": sum(record.redaction_count for record in records),
         }
 
 

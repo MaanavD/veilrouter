@@ -34,11 +34,12 @@ class EmailDetector:
 
 
 class FakeProvider:
-    def __init__(self, model: str, text: str = "ok", *, fail: bool = False, chunks=None) -> None:
+    def __init__(self, model: str, text: str = "ok", *, fail: bool = False, chunks=None, tool_calls=None) -> None:
         self.model = model
         self.text = text
         self.fail = fail
         self.chunks = chunks or []
+        self.tool_calls = tool_calls
         self.complete_calls = []
         self.stream_calls = []
 
@@ -46,7 +47,7 @@ class FakeProvider:
         self.complete_calls.append({"messages": messages, "opts": opts})
         if self.fail:
             raise ProviderCallError("provider failed")
-        return ChatResponse(text=self.text, model=self.model, tokens_in=12, tokens_out=4, raw={"ok": True})
+        return ChatResponse(text=self.text, model=self.model, tokens_in=12, tokens_out=4, tool_calls=self.tool_calls, raw={"ok": True})
 
     def stream(self, messages, **opts):
         self.stream_calls.append({"messages": messages, "opts": opts})
@@ -139,6 +140,104 @@ def test_router_routes_high_scores_to_cloud_with_redaction_and_restoration():
     assert cloud.complete_calls[0]["messages"][0]["content"] == "Please email [EMAIL_1]"
     assert "ada@example.com" not in cloud.complete_calls[0]["messages"][0]["content"]
     assert sink[0].pii_detected is True
+
+
+def test_router_forces_tool_requests_to_cloud_without_scoring_and_restores_tool_call_arguments():
+    scorer = StaticScorer(0)
+    cloud = FakeProvider(
+        "cloud",
+        text="",
+        tool_calls=[
+            {
+                "id": "call_1",
+                "type": "function",
+                "function": {"name": "send_email", "arguments": '{"to": "[EMAIL_1]"}'},
+            }
+        ],
+    )
+    router = Router(
+        RouterConfig(local_score_max=5, pii_regex_backstop=False),
+        local_provider=FakeProvider("local"),
+        cloud_provider=cloud,
+        scorer=scorer,
+        pii_detector=EmailDetector(),
+    )
+
+    response = router.run(
+        "Send an update to ada@example.com",
+        tools=[
+            {
+                "type": "function",
+                "function": {"name": "send_email", "parameters": {"type": "object"}},
+            }
+        ],
+    )
+
+    assert response.route == "cloud"
+    assert response.score is None
+    assert scorer.inputs == []
+    assert cloud.complete_calls[0]["messages"][0]["content"] == "Send an update to [EMAIL_1]"
+    assert response.tool_calls[0]["function"]["arguments"] == '{"to": "ada@example.com"}'
+
+
+def test_router_forces_tool_context_messages_to_cloud_without_scoring():
+    scorer = StaticScorer(0)
+    cloud = FakeProvider("cloud", text="tool summary")
+    router = Router(
+        RouterConfig(local_score_max=5),
+        local_provider=FakeProvider("local"),
+        cloud_provider=cloud,
+        scorer=scorer,
+        pii_detector=EmailDetector(),
+    )
+
+    response = router.run([{"role": "tool", "content": "tool result"}])
+
+    assert response.route == "cloud"
+    assert response.score is None
+    assert scorer.inputs == []
+
+
+def test_router_warmup_initializes_selected_components():
+    class Warmable:
+        model = "warmable"
+
+        def __init__(self):
+            self.calls = 0
+
+        def _ensure_client(self):
+            self.calls += 1
+
+        def complete(self, messages, **opts):
+            return ChatResponse(text="ok")
+
+        def stream(self, messages, **opts):
+            return iter(())
+
+    class WarmScorer:
+        def __init__(self):
+            self.provider = Warmable()
+
+        def score(self, text):
+            return 0
+
+    local = Warmable()
+    cloud = Warmable()
+    scorer = WarmScorer()
+    router = Router(
+        RouterConfig(),
+        local_provider=local,
+        cloud_provider=cloud,
+        scorer=scorer,
+        pii_detector=EmailDetector(),
+    )
+
+    timings = router.warmup(local=True, scorer=True, cloud=True)
+
+    assert set(timings) == {"local_ms", "scorer_ms", "cloud_ms"}
+    assert local.calls == 1
+    assert scorer.provider.calls == 1
+    assert cloud.calls == 1
 
 
 def test_router_can_retry_cloud_failures_locally_with_original_messages():

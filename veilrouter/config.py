@@ -38,6 +38,7 @@ class RouterConfig:
     debug: bool = False
     max_local_input_tokens: int | None = None
     route_long_inputs_to_cloud: bool = True
+    route_agent_features_to_cloud: bool = True
 
     def __post_init__(self) -> None:
         if self.scorer_model is None:
@@ -61,6 +62,7 @@ class RouterConfig:
             "pii_min_score": self.pii_min_score,
             "pii_regex_backstop": self.pii_regex_backstop,
             "retry_cloud_failures_locally": self.retry_cloud_failures_locally,
+            "route_agent_features_to_cloud": self.route_agent_features_to_cloud,
             "debug": self.debug,
         }
         args = ", ".join(f"{key}={value!r}" for key, value in values.items())

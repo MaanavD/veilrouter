@@ -70,6 +70,37 @@ The harness uses deterministic fake local/cloud providers, a heuristic scorer,
 and the regex PII detector. It does not require live provider credentials,
 Foundry Local, model downloads, or network access.
 
+## Agent and server harnesses
+
+`Router` is stateless per request: pass the complete OpenAI-style `messages`
+list for each turn. For long-running services, construct a router once per
+worker or session and warm model/client startup before serving traffic:
+
+```python
+router = Router(RouterConfig(cloud_model="openrouter/free"))
+router.warmup(local=True, scorer=True, cloud=False)
+```
+
+Agent features that typically require cloud support are routed to cloud by
+default without paying the local scorer cost first: `tools`, `tool_choice`,
+legacy `functions` / `function_call`, `response_format`, tool result messages,
+and prior assistant `tool_calls`. Cloud-bound message content is redacted before
+the provider call. Text responses and returned `tool_calls` are restored before
+being exposed on `RouterResponse`.
+
+```python
+response = router.run(
+    messages,
+    tools=[{"type": "function", "function": {"name": "send_email", "parameters": {"type": "object"}}}],
+)
+
+if response.tool_calls:
+    handle_tool_calls(response.tool_calls)
+```
+
+If you know your local model supports these agent features and want to allow
+local routing anyway, set `route_agent_features_to_cloud=False`.
+
 ## Foundry Local scorer evaluation
 
 Evaluate candidate local scorer models against the labeled 0-5 difficulty

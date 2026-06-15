@@ -23,11 +23,11 @@ class RecordingCreate:
         return self.response
 
 
-def _openai_response(text="hello", model="returned-model", prompt_tokens=7, completion_tokens=3):
+def _openai_response(text="hello", model="returned-model", prompt_tokens=7, completion_tokens=3, tool_calls=None):
     return SimpleNamespace(
         model=model,
         usage=SimpleNamespace(prompt_tokens=prompt_tokens, completion_tokens=completion_tokens),
-        choices=[SimpleNamespace(message=SimpleNamespace(content=text))],
+        choices=[SimpleNamespace(message=SimpleNamespace(content=text, tool_calls=tool_calls))],
     )
 
 
@@ -40,7 +40,8 @@ def _stream_chunk(text="", model="returned-model", prompt_tokens=None, completio
 
 
 def test_openai_compatible_complete_maps_sdk_response_without_network():
-    create = RecordingCreate(_openai_response(text="cloud answer"))
+    tool_calls = [{"id": "call_1"}]
+    create = RecordingCreate(_openai_response(text="cloud answer", tool_calls=tool_calls))
     provider = OpenAICompatibleProvider(model="gpt-test", base_url="https://example.invalid/v1", api_key="key")
     provider._client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
 
@@ -50,6 +51,7 @@ def test_openai_compatible_complete_maps_sdk_response_without_network():
     assert response.model == "returned-model"
     assert response.tokens_in == 7
     assert response.tokens_out == 3
+    assert response.tool_calls == tool_calls
     assert create.calls[0]["model"] == "gpt-test"
     assert create.calls[0]["temperature"] == 0
 

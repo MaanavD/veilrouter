@@ -7,6 +7,21 @@ def restore_text(text: str, placeholder_to_original: dict[str, str]) -> str:
     return PLACEHOLDER_RE.sub(lambda match: placeholder_to_original.get(match.group(0), match.group(0)), text)
 
 
+def restore_value(value, placeholder_to_original: dict[str, str]):
+    if isinstance(value, str):
+        return restore_text(value, placeholder_to_original)
+    if isinstance(value, dict):
+        return {key: restore_value(child, placeholder_to_original) for key, child in value.items()}
+    if isinstance(value, list):
+        return [restore_value(child, placeholder_to_original) for child in value]
+    if isinstance(value, tuple):
+        return tuple(restore_value(child, placeholder_to_original) for child in value)
+    model_dump = getattr(value, "model_dump", None)
+    if callable(model_dump):
+        return restore_value(model_dump(), placeholder_to_original)
+    return value
+
+
 class StreamRestorer:
     def __init__(self, placeholder_to_original: dict[str, str], *, max_buffer: int = 256) -> None:
         self.placeholder_to_original = placeholder_to_original

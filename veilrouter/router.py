@@ -10,7 +10,7 @@ from veilrouter.config import RouterConfig
 from veilrouter.errors import LocalContextExceededError, ProviderCallError
 from veilrouter.pii.detector import PiiDetector
 from veilrouter.pii.redactor import RedactionResult, Redactor
-from veilrouter.pii.restorer import StreamRestorer, restore_text
+from veilrouter.pii.restorer import StreamRestorer, restore_text, restore_value
 from veilrouter.providers.base import ChatChunk, ChatProvider, ChatResponse, Message
 from veilrouter.providers.foundry_local import FoundryLocalProvider
 from veilrouter.providers.openai_compatible import OpenAICompatibleProvider
@@ -34,6 +34,7 @@ class RouterResponse:
     pii_detected: bool = False
     redaction_count: int = 0
     redaction_categories: dict[str, int] = field(default_factory=dict)
+    tool_calls: Any = None
     raw: Any = None
 
 
@@ -79,14 +80,28 @@ class Router:
         self.redactor = Redactor(detector, regex_backstop=self.config.pii_regex_backstop)
         self.telemetry = telemetry or InMemoryTelemetryRecorder()
 
+    def warmup(self, *, local: bool = True, scorer: bool = True, cloud: bool = False) -> dict[str, float]:
+        timings: dict[str, float] = {}
+        if local:
+            timings["local_ms"] = _warm_component(self.local_provider)
+        if scorer:
+            provider = getattr(self.scorer, "provider", self.scorer)
+            timings["scorer_ms"] = _warm_component(provider)
+        if cloud:
+            timings["cloud_ms"] = _warm_component(self.cloud_provider)
+        return timings
+
     def run(self, prompt: str | list[Message], **opts: Any) -> RouterResponse:
         messages = normalize_messages(prompt)
         if is_empty_messages(messages):
             return RouterResponse(text="", route="none", score=None, model=None)
 
         started = time.perf_counter()
-        score = int(self.scorer.score(flatten_messages(messages)))
-        route = self._route_for_score(score, messages)
+        route = self._forced_route(messages, opts)
+        score = None
+        if route is None:
+            score = int(self.scorer.score(flatten_messages(messages)))
+            route = self._route_for_score(score, messages)
         logger.debug("route=%s score=%s model=%s", route, score, self._model_for_route(route))
 
         if route == "local":
@@ -104,8 +119,11 @@ class Router:
 
     def _stream_impl(self, messages: list[Message], opts: dict[str, Any]) -> Iterator[RouterChunk]:
         started = time.perf_counter()
-        score = int(self.scorer.score(flatten_messages(messages)))
-        route = self._route_for_score(score, messages)
+        route = self._forced_route(messages, opts)
+        score = None
+        if route is None:
+            score = int(self.scorer.score(flatten_messages(messages)))
+            route = self._route_for_score(score, messages)
         tokens_in = estimate_tokens(flatten_messages(messages))
         tokens_out = 0
         final_in: int | None = None
@@ -169,9 +187,15 @@ class Router:
             model=provider_response.model,
             tokens_in=provider_response.tokens_in,
             tokens_out=provider_response.tokens_out,
+            tool_calls=restore_value(provider_response.tool_calls, redaction.placeholder_to_original),
             raw=provider_response.raw,
         )
         return self._build_response(restored, "cloud", score, started, redaction)
+
+    def _forced_route(self, messages: list[Message], opts: dict[str, Any]) -> str | None:
+        if self.config.route_agent_features_to_cloud and requires_cloud_capabilities(messages, opts):
+            return "cloud"
+        return None
 
     def _route_for_score(self, score: int, messages: list[Message]) -> str:
         if score <= self.config.local_score_max:
@@ -190,7 +214,7 @@ class Router:
         self,
         provider_response: ChatResponse,
         route: str,
-        score: int,
+        score: int | None,
         started: float,
         redaction: RedactionResult | None,
     ) -> RouterResponse:
@@ -224,6 +248,7 @@ class Router:
             pii_detected=bool(redaction and redaction.redaction_count),
             redaction_count=redaction.redaction_count if redaction else 0,
             redaction_categories=redaction.categories if redaction else {},
+            tool_calls=provider_response.tool_calls,
             raw=provider_response.raw,
         )
 
@@ -274,8 +299,11 @@ class AsyncRouter(Router):
         if is_empty_messages(messages):
             return RouterResponse(text="", route="none", score=None, model=None)
         started = time.perf_counter()
-        score = await self._score_async(flatten_messages(messages))
-        route = self._route_for_score(score, messages)
+        route = self._forced_route(messages, opts)
+        score = None
+        if route is None:
+            score = await self._score_async(flatten_messages(messages))
+            route = self._route_for_score(score, messages)
         if route == "local":
             provider_response = await _acomplete(self.local_provider, messages, opts)
             return self._build_response(provider_response, route, score, started, None)
@@ -292,6 +320,7 @@ class AsyncRouter(Router):
             model=provider_response.model,
             tokens_in=provider_response.tokens_in,
             tokens_out=provider_response.tokens_out,
+            tool_calls=restore_value(provider_response.tool_calls, redaction.placeholder_to_original),
             raw=provider_response.raw,
         )
         return self._build_response(restored, route, score, started, redaction)
@@ -301,8 +330,11 @@ class AsyncRouter(Router):
         if is_empty_messages(messages):
             return
         started = time.perf_counter()
-        score = await self._score_async(flatten_messages(messages))
-        route = self._route_for_score(score, messages)
+        route = self._forced_route(messages, opts)
+        score = None
+        if route is None:
+            score = await self._score_async(flatten_messages(messages))
+            route = self._route_for_score(score, messages)
         redaction: RedactionResult | None = None
         restorer: StreamRestorer | None = None
         provider = self.local_provider
@@ -383,6 +415,18 @@ def estimate_tokens(text: str) -> int:
     return max(1, len(text) // 4) if text else 0
 
 
+def requires_cloud_capabilities(messages: list[Message], opts: dict[str, Any]) -> bool:
+    cloud_opt_keys = {"tools", "tool_choice", "functions", "function_call", "response_format"}
+    if any(opts.get(key) not in (None, [], {}) for key in cloud_opt_keys):
+        return True
+    for message in messages:
+        if message.get("role") in {"tool", "function"}:
+            return True
+        if any(message.get(key) not in (None, [], {}) for key in ("tool_calls", "function_call")):
+            return True
+    return False
+
+
 def _walk_strings(value: Any) -> Iterable[str]:
     if isinstance(value, str):
         yield value
@@ -408,3 +452,14 @@ async def _astream(provider: Any, messages: list[Message], opts: dict[str, Any])
     chunks = await asyncio.to_thread(lambda: list(provider.stream(messages, **opts)))
     for chunk in chunks:
         yield chunk
+
+
+def _warm_component(component: Any) -> float:
+    started = time.perf_counter()
+    if hasattr(component, "warmup"):
+        component.warmup()
+    elif hasattr(component, "_ensure_client"):
+        component._ensure_client()
+    elif hasattr(component, "_sync_client"):
+        component._sync_client()
+    return (time.perf_counter() - started) * 1000

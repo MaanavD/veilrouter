@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from typing import Any, AsyncIterator, Iterator
 
 from veilrouter.errors import ConfigurationError, ProviderCallError, ProviderSetupError
@@ -13,27 +14,33 @@ class OpenAICompatibleProvider:
         self.api_key = api_key
         self._client: Any | None = None
         self._async_client: Any | None = None
+        self._client_lock = threading.Lock()
+        self._async_client_lock = threading.Lock()
 
     def _sync_client(self) -> Any:
         if not self.api_key:
             raise ConfigurationError("cloud_api_key is required for cloud routing")
         if self._client is None:
-            try:
-                from openai import OpenAI
-            except ImportError as exc:
-                raise ProviderSetupError("install openai to use OpenAICompatibleProvider") from exc
-            self._client = OpenAI(api_key=self.api_key, base_url=self.base_url)
+            with self._client_lock:
+                if self._client is None:
+                    try:
+                        from openai import OpenAI
+                    except ImportError as exc:
+                        raise ProviderSetupError("install openai to use OpenAICompatibleProvider") from exc
+                    self._client = OpenAI(api_key=self.api_key, base_url=self.base_url)
         return self._client
 
     def _aclient(self) -> Any:
         if not self.api_key:
             raise ConfigurationError("cloud_api_key is required for cloud routing")
         if self._async_client is None:
-            try:
-                from openai import AsyncOpenAI
-            except ImportError as exc:
-                raise ProviderSetupError("install openai to use OpenAICompatibleProvider") from exc
-            self._async_client = AsyncOpenAI(api_key=self.api_key, base_url=self.base_url)
+            with self._async_client_lock:
+                if self._async_client is None:
+                    try:
+                        from openai import AsyncOpenAI
+                    except ImportError as exc:
+                        raise ProviderSetupError("install openai to use OpenAICompatibleProvider") from exc
+                    self._async_client = AsyncOpenAI(api_key=self.api_key, base_url=self.base_url)
         return self._async_client
 
     def complete(self, messages: list[Message], **opts: Any) -> ChatResponse:
@@ -46,12 +53,14 @@ class OpenAICompatibleProvider:
         except Exception as exc:  # SDK errors vary by provider implementation.
             raise ProviderCallError(f"cloud provider call failed: {exc}") from exc
         usage = getattr(response, "usage", None)
-        text = response.choices[0].message.content or ""
+        message = response.choices[0].message
+        text = message.content or ""
         return ChatResponse(
             text=text,
             model=getattr(response, "model", self.model),
             tokens_in=getattr(usage, "prompt_tokens", None),
             tokens_out=getattr(usage, "completion_tokens", None),
+            tool_calls=getattr(message, "tool_calls", None),
             raw=response,
         )
 
@@ -87,12 +96,14 @@ class OpenAICompatibleProvider:
         except Exception as exc:
             raise ProviderCallError(f"cloud provider call failed: {exc}") from exc
         usage = getattr(response, "usage", None)
-        text = response.choices[0].message.content or ""
+        message = response.choices[0].message
+        text = message.content or ""
         return ChatResponse(
             text=text,
             model=getattr(response, "model", self.model),
             tokens_in=getattr(usage, "prompt_tokens", None),
             tokens_out=getattr(usage, "completion_tokens", None),
+            tool_calls=getattr(message, "tool_calls", None),
             raw=response,
         )
 

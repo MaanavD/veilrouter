@@ -12,6 +12,7 @@ class ChatResponse:
     model: str | None = None
     tokens_in: int | None = None
     tokens_out: int | None = None
+    tool_calls: Any = None
     raw: Any = None
 
 
