@@ -109,6 +109,18 @@ python examples\privacy_diagnostics.py
 python examples\privacy_diagnostics.py --live-openrouter
 ```
 
+The privacy diagnostic uses fake local/cloud providers by default so it can
+prove redaction behavior quickly. To verify actual Foundry Local scorer and
+local route model execution, run:
+
+```powershell
+python examples\real_local_diagnostics.py
+```
+
+If this script times out during `warm scorer provider` or `warm local provider`,
+Foundry Local model loading is not healthy yet; the privacy diagnostics may still
+pass because they intentionally use fake local providers.
+
 ## Foundry Local scorer evaluation
 
 Evaluate candidate local scorer models against the labeled 0-5 difficulty
