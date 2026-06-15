@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import getpass
+import json
 import os
 import time
 from pprint import pprint
@@ -100,6 +101,7 @@ def run_local_route_demo() -> None:
     print("pii_detected:", response.pii_detected)
 
     assert response.route == "local"
+    assert "Jane Doe" in local_seen
     assert "jane@example.com" in local_seen
     assert "+1 (425) 555-0199" in local_seen
     assert cloud.messages is None
@@ -110,7 +112,7 @@ def run_cloud_text_redaction_demo() -> None:
     print_section("2. cloud route redacts before send and restores text response")
     cloud = RecordingProvider(
         "fake-cloud",
-        ChatResponse(text="Cloud saw [EMAIL_1] and [PHONE_1].", model="fake-cloud", tokens_in=10, tokens_out=4),
+        ChatResponse(text="Cloud saw [PERSON_NAME_1], [EMAIL_1], and [PHONE_1].", model="fake-cloud", tokens_in=10, tokens_out=4),
     )
     router = Router(
         RouterConfig(cloud_model="fake-cloud", pii_regex_backstop=True),
@@ -132,13 +134,16 @@ def run_cloud_text_redaction_demo() -> None:
     print("redaction metadata:", response.redaction_count, response.redaction_categories)
 
     assert response.route == "cloud"
+    assert "Jane Doe" not in cloud_seen
     assert "jane@example.com" not in cloud_seen
     assert "+1 (425) 555-0199" not in cloud_seen
+    assert "[PERSON_NAME_1]" in cloud_seen
     assert "[EMAIL_1]" in cloud_seen
     assert "[PHONE_1]" in cloud_seen
+    assert "Jane Doe" in response.text
     assert "jane@example.com" in response.text
     assert "+1 (425) 555-0199" in response.text
-    assert response.redaction_categories == {"EMAIL": 1, "PHONE": 1}
+    assert response.redaction_categories == {"PERSON_NAME": 1, "EMAIL": 1, "PHONE": 1}
 
 
 def run_cloud_tool_call_demo() -> None:
@@ -149,7 +154,7 @@ def run_cloud_tool_call_demo() -> None:
             "type": "function",
             "function": {
                 "name": "send_followup",
-                "arguments": '{"email": "[EMAIL_1]", "phone": "[PHONE_1]"}',
+                "arguments": '{"name": "[PERSON_NAME_1]", "email": "[EMAIL_1]", "phone": "[PHONE_1]"}',
             },
         }
     ]
@@ -181,14 +186,25 @@ def run_cloud_tool_call_demo() -> None:
     print(cloud_seen)
     print("restored tool calls:")
     pprint(response.tool_calls)
+    print("local tool execution with restored arguments:")
+    tool_result = execute_restored_tool_call(response.tool_calls[0])
+    pprint(tool_result)
     print("score:", response.score, "(None means scorer was skipped because tools require cloud)")
 
     assert response.route == "cloud"
     assert response.score is None
     assert scorer.calls == 0
+    assert "Jane Doe" not in cloud_seen
     assert "jane@example.com" not in cloud_seen
     assert "+1 (425) 555-0199" not in cloud_seen
-    assert response.tool_calls[0]["function"]["arguments"] == '{"email": "jane@example.com", "phone": "+1 (425) 555-0199"}'
+    assert "[PERSON_NAME_1]" in cloud_seen
+    assert response.tool_calls[0]["function"]["arguments"] == '{"name": "Jane Doe", "email": "jane@example.com", "phone": "+1 (425) 555-0199"}'
+    assert tool_result == {
+        "sent": True,
+        "recipient": "Jane Doe",
+        "email": "jane@example.com",
+        "phone": "+1 (425) 555-0199",
+    }
 
 
 def run_live_openrouter_demo(model: str, max_tokens: int) -> None:
@@ -243,10 +259,28 @@ def run_live_openrouter_demo(model: str, max_tokens: int) -> None:
     )
 
     assert response.route == "cloud"
+    assert "Jane Doe" not in cloud_seen
     assert "jane@example.com" not in cloud_seen
     assert "+1 (425) 555-0199" not in cloud_seen
+    assert "[PERSON_NAME_1]" in cloud_seen
     assert "[EMAIL_1]" in cloud_seen
     assert "[PHONE_1]" in cloud_seen
+
+
+def execute_restored_tool_call(tool_call: dict[str, Any]) -> dict[str, Any]:
+    if tool_call["function"]["name"] != "send_followup":
+        raise ValueError(f"unexpected tool call: {tool_call['function']['name']}")
+    args = json.loads(tool_call["function"]["arguments"])
+    return send_followup(**args)
+
+
+def send_followup(*, name: str, email: str, phone: str) -> dict[str, Any]:
+    return {
+        "sent": True,
+        "recipient": name,
+        "email": email,
+        "phone": phone,
+    }
 
 
 def first_content(messages: list[Message] | None) -> str:

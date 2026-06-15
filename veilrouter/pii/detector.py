@@ -24,6 +24,15 @@ class RegexPiiDetector:
     IBAN_RE = re.compile(r"\b[A-Z]{2}\d{2}[A-Z0-9]{11,30}\b", re.IGNORECASE)
     PHONE_RE = re.compile(r"(?<!\w)(?:\+?\d[\d .()\-]{7,}\d)(?!\w)")
     CARD_RE = re.compile(r"(?<!\d)(?:\d[ -]?){13,19}(?!\d)")
+    PERSON_NAME_RE = re.compile(
+        r"\b(?:to|for|from|with|customer|client|patient|employee|contact|recipient|user)\s+"
+        r"(?P<name>[A-Z][a-z]+(?:[-'][A-Z][a-z]+)?(?:\s+[A-Z][a-z]+(?:[-'][A-Z][a-z]+)?){1,3})"
+        r"(?=\s+(?:at|via|on|about|and|with|cannot|can|is|was|will)\b|[,.;]|$)"
+    )
+    PERSON_NAME_BEFORE_EMAIL_RE = re.compile(
+        r"\b(?P<name>[A-Z][a-z]+(?:[-'][A-Z][a-z]+)?(?:\s+[A-Z][a-z]+(?:[-'][A-Z][a-z]+)?){1,3})"
+        r"\s+at\s+[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b",
+    )
 
     def detect(self, text: str) -> list[Span]:
         spans: list[Span] = []
@@ -41,6 +50,8 @@ class RegexPiiDetector:
             if 13 <= len(digits) <= 19:
                 continue
             spans.append(Span("contact.phone", match.start(), match.end(), candidate, 1.0))
+        spans.extend(_person_name_spans(self.PERSON_NAME_RE, text))
+        spans.extend(_person_name_spans(self.PERSON_NAME_BEFORE_EMAIL_RE, text))
         return _dedupe_spans(spans)
 
 
@@ -132,6 +143,24 @@ def _resolve_model_paths(path: Path) -> tuple[Path, Path]:
 
 def _spans_from_regex(category: str, regex: re.Pattern[str], text: str) -> list[Span]:
     return [Span(category, m.start(), m.end(), m.group(0), 1.0) for m in regex.finditer(text)]
+
+
+def _person_name_spans(regex: re.Pattern[str], text: str) -> list[Span]:
+    spans: list[Span] = []
+    for match in regex.finditer(text):
+        group = match.group("name")
+        start, end = match.span("name")
+        if _looks_like_person_name(group):
+            spans.append(Span("identity.person_name", start, end, group, 1.0))
+    return spans
+
+
+def _looks_like_person_name(value: str) -> bool:
+    parts = value.split()
+    if len(parts) < 2 or len(parts) > 4:
+        return False
+    blocked = {"API", "HTTP", "HTTPS", "OAuth", "CPU", "JSON", "SQL", "OpenAI", "OpenRouter", "Foundry", "Local"}
+    return all(part not in blocked and part[:1].isupper() for part in parts)
 
 
 def _luhn_valid(digits: str) -> bool:
