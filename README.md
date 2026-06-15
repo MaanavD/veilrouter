@@ -101,6 +101,14 @@ if response.tool_calls:
 If you know your local model supports these agent features and want to allow
 local routing anyway, set `route_agent_features_to_cloud=False`.
 
+To see the privacy flow end-to-end, including before/after redaction and
+tool-call restoration, run:
+
+```powershell
+python examples\privacy_diagnostics.py
+python examples\privacy_diagnostics.py --live-openrouter
+```
+
 ## Foundry Local scorer evaluation
 
 Evaluate candidate local scorer models against the labeled 0-5 difficulty

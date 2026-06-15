@@ -48,6 +48,7 @@ packages = ["veilrouter"]
 [tool.hatch.build.targets.sdist]
 include = [
   "benchmarks",
+  "examples",
   "tests",
   "veilrouter",
   "CHANGELOG.md",
