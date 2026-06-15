@@ -6,10 +6,25 @@ build-backend = "hatchling.build"
 name = "veilroute"
 version = "0.1.0"
 description = "PII-aware local/cloud model router with transparent redaction."
-readme = "README.md"
+readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.10"
-license = { text = "MIT" }
+license = { file = "LICENSE" }
+license-files = ["LICENSE"]
 authors = [{ name = "Veilroute contributors" }]
+keywords = ["ai", "llm", "privacy", "pii", "routing", "foundry-local"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Typing :: Typed",
+]
 dependencies = [
   "numpy>=1.24",
   "onnxruntime>=1.17",
@@ -19,8 +34,30 @@ dependencies = [
 
 [project.optional-dependencies]
 foundry = ["foundry-local-sdk>=0.3"]
-dev = ["pytest>=8.0", "pytest-asyncio>=0.23"]
+dev = ["build>=1.2", "pytest>=8.0", "pytest-asyncio>=0.23", "twine>=5.0"]
 benchmarks = ["pandas>=2.0"]
+
+[project.urls]
+Homepage = "https://github.com/MaanavD/veilroute"
+Repository = "https://github.com/MaanavD/veilroute"
+Issues = "https://github.com/MaanavD/veilroute/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["veilroute"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "benchmarks",
+  "tests",
+  "veilroute",
+  "CHANGELOG.md",
+  "CODE_OF_CONDUCT.md",
+  "CONTRIBUTING.md",
+  "LICENSE",
+  "README.md",
+  "SECURITY.md",
+  "pyproject.toml",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

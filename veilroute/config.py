@@ -8,6 +8,8 @@ from typing import Any, Callable
 from veilroute.telemetry.pricing import DEFAULT_PRICING
 
 
+DEFAULT_SCORER_MODEL = "phi-3.5-mini"
+DEFAULT_SCORER_MAX_TOKENS = 256
 TelemetrySink = Callable[[Any], None]
 
 
@@ -20,7 +22,7 @@ class ModelSpec:
 @dataclass(slots=True)
 class RouterConfig:
     local_model: str = "qwen2.5-0.5b"
-    scorer_model: str | None = None
+    scorer_model: str | None = DEFAULT_SCORER_MODEL
     cloud_endpoint: str | None = None
     cloud_api_key: str | None = None
     cloud_model: str = "gpt-4o"
@@ -30,7 +32,7 @@ class RouterConfig:
     pii_regex_backstop: bool = True
     retry_cloud_failures_locally: bool = False
     scorer_temperature: float = 0.0
-    scorer_max_tokens: int = 8
+    scorer_max_tokens: int = DEFAULT_SCORER_MAX_TOKENS
     pricing: dict[str, dict[str, float]] = field(default_factory=lambda: dict(DEFAULT_PRICING))
     telemetry_sink: TelemetrySink | None = None
     debug: bool = False

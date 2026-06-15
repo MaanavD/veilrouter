@@ -4,12 +4,27 @@
 OpenAI-compatible cloud model. Cloud-bound requests are redacted before they
 leave the machine and restored transparently in the model response.
 
+## Install
+
+```powershell
+pip install veilroute
+pip install "veilroute[foundry]"  # for live Foundry Local routing
+```
+
+For local development:
+
+```powershell
+python -m pip install -e ".[dev,foundry]"
+python -m pytest -q
+```
+
+## Usage
+
 ```python
 from veilroute import Router, RouterConfig
 
 router = Router(RouterConfig(
     local_model="qwen2.5-0.5b",
-    scorer_model="phi-3.5-mini",
     cloud_endpoint="https://example.openai.azure.com/openai/v1",
     cloud_api_key="...",
     cloud_model="gpt-4o",
@@ -22,7 +37,8 @@ print(response.route, response.score, response.cost_saved)
 ```
 
 `run()` and `stream()` accept either a string or OpenAI-style chat messages.
-The cloud API key is resolved from explicit config first, then
+The default scorer model is `phi-3.5-mini`, selected from the local scorer
+benchmark. The cloud API key is resolved from explicit config first, then
 `VEILROUTE_CLOUD_API_KEY`. Secrets and raw PII are not included in telemetry or
 debug logs.
 
@@ -78,3 +94,17 @@ In the current 36-prompt local evaluation, `phi-3.5-mini` ranked best for
 difficulty scoring after load/inference speed penalties: 100% local-vs-cloud
 route accuracy, 52.78% exact score accuracy, 91.67% within-1 accuracy, 2.78%
 parse failures, 7.95s setup/load latency, and 30.93s p95 inference latency.
+
+## Publishing
+
+Package metadata lives in `pyproject.toml`, and release builds are validated with:
+
+```powershell
+python -m build
+python -m twine check dist\*
+```
+
+The `Publish` GitHub Actions workflow is configured for PyPI Trusted Publishing
+on GitHub releases. Configure the PyPI project to trust
+`MaanavD/veilroute`, environment `pypi`, workflow
+`.github/workflows/publish.yml` before publishing a release.
