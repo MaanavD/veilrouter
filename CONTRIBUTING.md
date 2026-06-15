@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for considering a contribution to `veilroute`.
+Thanks for considering a contribution to `veilrouter`.
 
 ## Development setup
 

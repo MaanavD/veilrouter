@@ -4,8 +4,8 @@ import asyncio
 import importlib
 from typing import Any, AsyncIterator, Iterator
 
-from veilroute.errors import ProviderCallError, ProviderSetupError
-from veilroute.providers.base import ChatChunk, ChatResponse, Message
+from veilrouter.errors import ProviderCallError, ProviderSetupError
+from veilrouter.providers.base import ChatChunk, ChatResponse, Message
 
 
 class FoundryLocalProvider:
@@ -38,7 +38,7 @@ class FoundryLocalProvider:
             return self._initialize_legacy_foundry_local()
         except ImportError as legacy_exc:
             raise ProviderSetupError(
-                "Foundry Local SDK is required for local routing. Install veilroute[foundry]."
+                "Foundry Local SDK is required for local routing. Install veilrouter[foundry]."
             ) from legacy_exc
 
     def _initialize_foundry_local_sdk(self) -> Any:
@@ -51,7 +51,7 @@ class FoundryLocalProvider:
         initialize = getattr(manager_cls, "initialize", None)
         if initialize is not None:
             try:
-                initialize(configuration(app_name="veilroute"))
+                initialize(configuration(app_name="veilrouter"))
             except Exception as exc:
                 if "singleton" not in str(exc).lower() and "already been initialized" not in str(exc).lower():
                     raise

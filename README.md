@@ -1,14 +1,14 @@
-# veilroute
+# veilrouter
 
-`veilroute` routes simple prompts to a local model and harder prompts to an
+`veilrouter` routes simple prompts to a local model and harder prompts to an
 OpenAI-compatible cloud model. Cloud-bound requests are redacted before they
 leave the machine and restored transparently in the model response.
 
 ## Install
 
 ```powershell
-pip install veilroute
-pip install "veilroute[foundry]"  # for live Foundry Local routing
+pip install veilrouter
+pip install "veilrouter[foundry]"  # for live Foundry Local routing
 ```
 
 For local development:
@@ -21,7 +21,7 @@ python -m pytest -q
 ## Usage
 
 ```python
-from veilroute import Router, RouterConfig
+from veilrouter import Router, RouterConfig
 
 router = Router(RouterConfig(
     local_model="qwen2.5-0.5b",
@@ -39,7 +39,7 @@ print(response.route, response.score, response.cost_saved)
 `run()` and `stream()` accept either a string or OpenAI-style chat messages.
 The default scorer model is `phi-3.5-mini`, selected from the local scorer
 benchmark. The cloud API key is resolved from explicit config first, then
-`VEILROUTE_CLOUD_API_KEY`. Secrets and raw PII are not included in telemetry or
+`VEILROUTER_CLOUD_API_KEY`. Secrets and raw PII are not included in telemetry or
 debug logs.
 
 ## Provider notes
@@ -106,5 +106,5 @@ python -m twine check dist\*
 
 The `Publish` GitHub Actions workflow is configured for PyPI Trusted Publishing
 on GitHub releases. Configure the PyPI project to trust
-`MaanavD/veilroute`, environment `pypi`, workflow
+`MaanavD/veilrouter`, environment `pypi`, workflow
 `.github/workflows/publish.yml` before publishing a release.

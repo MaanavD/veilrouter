@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Any, AsyncIterator, Iterator
 
-from veilroute.errors import ConfigurationError, ProviderCallError, ProviderSetupError
-from veilroute.providers.base import ChatChunk, ChatResponse, Message
+from veilrouter.errors import ConfigurationError, ProviderCallError, ProviderSetupError
+from veilrouter.providers.base import ChatChunk, ChatResponse, Message
 
 
 class OpenAICompatibleProvider:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from veilroute.pii.placeholders import PLACEHOLDER_RE
+from veilrouter.pii.placeholders import PLACEHOLDER_RE
 
 
 def restore_text(text: str, placeholder_to_original: dict[str, str]) -> str:

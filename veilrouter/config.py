@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
-from veilroute.telemetry.pricing import DEFAULT_PRICING
+from veilrouter.telemetry.pricing import DEFAULT_PRICING
 
 
 DEFAULT_SCORER_MODEL = "phi-3.5-mini"
@@ -43,9 +43,9 @@ class RouterConfig:
         if self.scorer_model is None:
             self.scorer_model = self.local_model
         if self.cloud_api_key is None:
-            self.cloud_api_key = os.getenv("VEILROUTE_CLOUD_API_KEY")
+            self.cloud_api_key = os.getenv("VEILROUTER_CLOUD_API_KEY") or os.getenv("VEILROUTE_CLOUD_API_KEY")
         if self.cloud_endpoint is None:
-            self.cloud_endpoint = os.getenv("VEILROUTE_CLOUD_ENDPOINT")
+            self.cloud_endpoint = os.getenv("VEILROUTER_CLOUD_ENDPOINT") or os.getenv("VEILROUTE_CLOUD_ENDPOINT")
         self.local_score_max = max(0, min(5, int(self.local_score_max)))
         self.pii_model_path = Path(self.pii_model_path)
 

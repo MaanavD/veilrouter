@@ -5,10 +5,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from veilroute.errors import ConfigurationError, ProviderCallError, ProviderSetupError
-import veilroute.providers.foundry_local as foundry_local_module
-from veilroute.providers.foundry_local import FoundryLocalProvider
-from veilroute.providers.openai_compatible import OpenAICompatibleProvider
+from veilrouter.errors import ConfigurationError, ProviderCallError, ProviderSetupError
+import veilrouter.providers.foundry_local as foundry_local_module
+from veilrouter.providers.foundry_local import FoundryLocalProvider
+from veilrouter.providers.openai_compatible import OpenAICompatibleProvider
 
 
 class RecordingCreate:
@@ -234,7 +234,7 @@ def test_foundry_local_uses_installed_foundry_local_sdk_when_legacy_import_missi
     response = provider.complete([{"role": "user", "content": "hello"}], temperature=0, max_tokens=8)
 
     assert response.text == "sdk answer"
-    assert FakeFoundryLocalManager.initialized_with[0].app_name == "veilroute"
+    assert FakeFoundryLocalManager.initialized_with[0].app_name == "veilrouter"
     assert manager.catalog.requested == ["qwen3-0.6b"]
     assert model.downloads == 1
     assert model.loads == 1

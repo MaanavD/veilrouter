@@ -6,19 +6,19 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Iterable, Iterator
 
-from veilroute.config import RouterConfig
-from veilroute.errors import LocalContextExceededError, ProviderCallError
-from veilroute.pii.detector import PiiDetector
-from veilroute.pii.redactor import RedactionResult, Redactor
-from veilroute.pii.restorer import StreamRestorer, restore_text
-from veilroute.providers.base import ChatChunk, ChatProvider, ChatResponse, Message
-from veilroute.providers.foundry_local import FoundryLocalProvider
-from veilroute.providers.openai_compatible import OpenAICompatibleProvider
-from veilroute.scoring.llm_scorer import LlmDifficultyScorer
-from veilroute.telemetry.pricing import estimate_cost
-from veilroute.telemetry.recorder import InMemoryTelemetryRecorder, TelemetryRecord, now_utc
+from veilrouter.config import RouterConfig
+from veilrouter.errors import LocalContextExceededError, ProviderCallError
+from veilrouter.pii.detector import PiiDetector
+from veilrouter.pii.redactor import RedactionResult, Redactor
+from veilrouter.pii.restorer import StreamRestorer, restore_text
+from veilrouter.providers.base import ChatChunk, ChatProvider, ChatResponse, Message
+from veilrouter.providers.foundry_local import FoundryLocalProvider
+from veilrouter.providers.openai_compatible import OpenAICompatibleProvider
+from veilrouter.scoring.llm_scorer import LlmDifficultyScorer
+from veilrouter.telemetry.pricing import estimate_cost
+from veilrouter.telemetry.recorder import InMemoryTelemetryRecorder, TelemetryRecord, now_utc
 
-logger = logging.getLogger("veilroute")
+logger = logging.getLogger("veilrouter")
 
 
 @dataclass(frozen=True, slots=True)

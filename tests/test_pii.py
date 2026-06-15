@@ -1,7 +1,7 @@
-from veilroute.pii.detector import RegexPiiDetector, Span
-from veilroute.pii.placeholders import PlaceholderFactory, category_label, is_placeholder
-from veilroute.pii.redactor import Redactor
-from veilroute.pii.restorer import StreamRestorer, restore_text
+from veilrouter.pii.detector import RegexPiiDetector, Span
+from veilrouter.pii.placeholders import PlaceholderFactory, category_label, is_placeholder
+from veilrouter.pii.redactor import Redactor
+from veilrouter.pii.restorer import StreamRestorer, restore_text
 
 
 def test_regex_detector_finds_common_pii_and_ignores_invalid_credit_cards():

@@ -1,7 +1,7 @@
-"""Public API for veilroute."""
+"""Public API for veilrouter."""
 
-from veilroute.config import DEFAULT_SCORER_MAX_TOKENS, DEFAULT_SCORER_MODEL, ModelSpec, RouterConfig
-from veilroute.router import AsyncRouter, Router, RouterChunk, RouterResponse, run
+from veilrouter.config import DEFAULT_SCORER_MAX_TOKENS, DEFAULT_SCORER_MODEL, ModelSpec, RouterConfig
+from veilrouter.router import AsyncRouter, Router, RouterChunk, RouterResponse, run
 
 __version__ = "0.1.0"
 

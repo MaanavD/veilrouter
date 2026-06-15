@@ -13,10 +13,10 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from veilroute.errors import ScoreParseError  # noqa: E402
-from veilroute.providers.foundry_local import FoundryLocalProvider  # noqa: E402
-from veilroute.scoring.llm_scorer import _RUBRIC  # noqa: E402
-from veilroute.scoring.parsing import parse_score  # noqa: E402
+from veilrouter.errors import ScoreParseError  # noqa: E402
+from veilrouter.providers.foundry_local import FoundryLocalProvider  # noqa: E402
+from veilrouter.scoring.llm_scorer import _RUBRIC  # noqa: E402
+from veilrouter.scoring.parsing import parse_score  # noqa: E402
 
 DEFAULT_DATASET = Path(__file__).with_name("scoring_eval_dataset.json")
 MAX_INFERENCE_SPEED_PENALTY = 0.10
@@ -308,7 +308,7 @@ def run_model(
 
 
 def print_text(results: dict[str, Any]) -> None:
-    print("veilroute Foundry Local scorer benchmark")
+    print("veilrouter Foundry Local scorer benchmark")
     print(f"dataset={results['dataset']} examples={results['examples']} local_score_max={results['local_score_max']}")
     print()
     for index, summary in enumerate(results["ranked"], start=1):
@@ -327,7 +327,7 @@ def print_text(results: dict[str, Any]) -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Benchmark Foundry Local scorer models for veilroute routing scores.")
+    parser = argparse.ArgumentParser(description="Benchmark Foundry Local scorer models for veilrouter routing scores.")
     parser.add_argument("models", nargs="+", help="Candidate Foundry Local scorer model names.")
     parser.add_argument("--dataset", type=Path, default=DEFAULT_DATASET, help="Labeled JSON prompt dataset.")
     parser.add_argument("--limit", type=int, default=None, help="Evaluate only the first N examples.")

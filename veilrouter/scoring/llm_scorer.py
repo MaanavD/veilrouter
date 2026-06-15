@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from veilroute.providers.base import AsyncChatProvider, ChatProvider
-from veilroute.scoring.parsing import parse_score
+from veilrouter.providers.base import AsyncChatProvider, ChatProvider
+from veilrouter.scoring.parsing import parse_score
 
 _RUBRIC = """You score prompt difficulty for model routing.
 Return only JSON: {"score": n} where n is an integer 0-5.

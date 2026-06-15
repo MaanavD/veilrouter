@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
-from veilroute.telemetry.pricing import estimate_cost
-from veilroute.telemetry.recorder import InMemoryTelemetryRecorder, TelemetryRecord, now_utc
+from veilrouter.telemetry.pricing import estimate_cost
+from veilrouter.telemetry.recorder import InMemoryTelemetryRecorder, TelemetryRecord, now_utc
 
 
 def test_estimate_cost_uses_per_thousand_token_rates_and_unknown_models_are_free():

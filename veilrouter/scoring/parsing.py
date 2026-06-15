@@ -4,7 +4,7 @@ import json
 import re
 from typing import Any
 
-from veilroute.errors import ScoreParseError
+from veilrouter.errors import ScoreParseError
 
 _THINK_RE = re.compile(r"<think>.*?</think>", re.IGNORECASE | re.DOTALL)
 _SCORE_FIELD_RE = re.compile(r'"score"\s*:\s*"?(-?\d+)"?', re.IGNORECASE)

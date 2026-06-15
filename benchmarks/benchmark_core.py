@@ -15,9 +15,9 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from veilroute import Router, RouterConfig  # noqa: E402
-from veilroute.pii.detector import RegexPiiDetector  # noqa: E402
-from veilroute.providers.base import ChatChunk, ChatResponse, Message  # noqa: E402
+from veilrouter import Router, RouterConfig  # noqa: E402
+from veilrouter.pii.detector import RegexPiiDetector  # noqa: E402
+from veilrouter.providers.base import ChatChunk, ChatResponse, Message  # noqa: E402
 
 
 PLACEHOLDER_RE = re.compile(r"\[[A-Z][A-Z0-9_]*_[1-9][0-9]*\]")
@@ -209,7 +209,7 @@ def percentile(values: list[float], pct: float) -> float:
 
 def print_text(summary: dict[str, Any]) -> None:
     latency = summary["latency_ms"]
-    print("veilroute core benchmark (offline deterministic)")
+    print("veilrouter core benchmark (offline deterministic)")
     print(f"mode={summary['mode']} calls={summary['calls']} workloads={summary['workloads']} iterations={summary['iterations']}")
     print(
         "latency_ms "
@@ -220,7 +220,7 @@ def print_text(summary: dict[str, Any]) -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run an offline deterministic benchmark for veilroute core routing.")
+    parser = argparse.ArgumentParser(description="Run an offline deterministic benchmark for veilrouter core routing.")
     parser.add_argument("--iterations", type=int, default=50, help="Measured iterations over the built-in workload set.")
     parser.add_argument("--warmup", type=int, default=5, help="Warmup iterations excluded from timings.")
     parser.add_argument("--mode", choices=("run", "stream"), default="run", help="Benchmark Router.run or Router.stream.")

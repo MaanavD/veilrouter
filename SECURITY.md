@@ -1,6 +1,6 @@
 # Security Policy
 
-`veilroute` is designed for privacy-sensitive workloads. Please do not disclose
+`veilrouter` is designed for privacy-sensitive workloads. Please do not disclose
 potential vulnerabilities publicly before they can be reviewed.
 
 ## Reporting a vulnerability

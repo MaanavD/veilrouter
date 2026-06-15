@@ -2,10 +2,10 @@ import asyncio
 
 import pytest
 
-from veilroute.errors import ScoreParseError
-from veilroute.providers.base import ChatResponse
-from veilroute.scoring.llm_scorer import LlmDifficultyScorer
-from veilroute.scoring.parsing import parse_score
+from veilrouter.errors import ScoreParseError
+from veilrouter.providers.base import ChatResponse
+from veilrouter.scoring.llm_scorer import LlmDifficultyScorer
+from veilrouter.scoring.parsing import parse_score
 
 
 @pytest.mark.parametrize(

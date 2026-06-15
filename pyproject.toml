@@ -3,14 +3,14 @@ requires = ["hatchling>=1.21"]
 build-backend = "hatchling.build"
 
 [project]
-name = "veilroute"
+name = "veilrouter"
 version = "0.1.0"
 description = "PII-aware local/cloud model router with transparent redaction."
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
 license-files = ["LICENSE"]
-authors = [{ name = "Veilroute contributors" }]
+authors = [{ name = "Veilrouter contributors" }]
 keywords = ["ai", "llm", "privacy", "pii", "routing", "foundry-local"]
 classifiers = [
   "Development Status :: 3 - Alpha",
@@ -38,18 +38,18 @@ dev = ["build>=1.2", "pytest>=8.0", "pytest-asyncio>=0.23", "twine>=5.0"]
 benchmarks = ["pandas>=2.0"]
 
 [project.urls]
-Homepage = "https://github.com/MaanavD/veilroute"
-Repository = "https://github.com/MaanavD/veilroute"
-Issues = "https://github.com/MaanavD/veilroute/issues"
+Homepage = "https://github.com/MaanavD/veilrouter"
+Repository = "https://github.com/MaanavD/veilrouter"
+Issues = "https://github.com/MaanavD/veilrouter/issues"
 
 [tool.hatch.build.targets.wheel]
-packages = ["veilroute"]
+packages = ["veilrouter"]
 
 [tool.hatch.build.targets.sdist]
 include = [
   "benchmarks",
   "tests",
-  "veilroute",
+  "veilrouter",
   "CHANGELOG.md",
   "CODE_OF_CONDUCT.md",
   "CONTRIBUTING.md",

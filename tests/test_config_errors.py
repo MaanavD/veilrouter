@@ -2,20 +2,20 @@ from pathlib import Path
 
 import pytest
 
-from veilroute.config import DEFAULT_SCORER_MAX_TOKENS, DEFAULT_SCORER_MODEL, ModelSpec, RouterConfig
-from veilroute.errors import (
+from veilrouter.config import DEFAULT_SCORER_MAX_TOKENS, DEFAULT_SCORER_MODEL, ModelSpec, RouterConfig
+from veilrouter.errors import (
     ConfigurationError,
     LocalContextExceededError,
     ProviderCallError,
     ProviderSetupError,
     ScoreParseError,
-    VeilrouteError,
+    VeilrouterError,
 )
 
 
 def test_router_config_reads_environment_clamps_score_and_redacts_secret(monkeypatch):
-    monkeypatch.setenv("VEILROUTE_CLOUD_API_KEY", "secret-key")
-    monkeypatch.setenv("VEILROUTE_CLOUD_ENDPOINT", "https://example.invalid/v1")
+    monkeypatch.setenv("VEILROUTER_CLOUD_API_KEY", "secret-key")
+    monkeypatch.setenv("VEILROUTER_CLOUD_ENDPOINT", "https://example.invalid/v1")
 
     config = RouterConfig(local_model="local-model", local_score_max=99, pii_model_path="models/pii")
 
@@ -30,12 +30,24 @@ def test_router_config_reads_environment_clamps_score_and_redacts_secret(monkeyp
 
 
 def test_router_config_can_still_use_local_model_as_scorer_when_explicitly_requested(monkeypatch):
-    monkeypatch.delenv("VEILROUTE_CLOUD_API_KEY", raising=False)
-    monkeypatch.delenv("VEILROUTE_CLOUD_ENDPOINT", raising=False)
+    monkeypatch.delenv("VEILROUTER_CLOUD_API_KEY", raising=False)
+    monkeypatch.delenv("VEILROUTER_CLOUD_ENDPOINT", raising=False)
 
     config = RouterConfig(local_model="local-model", scorer_model=None)
 
     assert config.scorer_model == "local-model"
+
+
+def test_router_config_accepts_legacy_veilroute_environment_names(monkeypatch):
+    monkeypatch.delenv("VEILROUTER_CLOUD_API_KEY", raising=False)
+    monkeypatch.delenv("VEILROUTER_CLOUD_ENDPOINT", raising=False)
+    monkeypatch.setenv("VEILROUTE_CLOUD_API_KEY", "legacy-secret")
+    monkeypatch.setenv("VEILROUTE_CLOUD_ENDPOINT", "https://legacy.example.invalid/v1")
+
+    config = RouterConfig()
+
+    assert config.cloud_api_key == "legacy-secret"
+    assert config.cloud_endpoint == "https://legacy.example.invalid/v1"
 
 
 @pytest.mark.parametrize(
@@ -43,8 +55,8 @@ def test_router_config_can_still_use_local_model_as_scorer_when_explicitly_reque
     [(-1, 0), (0, 0), (3, 3), (6, 5), ("4", 4)],
 )
 def test_router_config_normalizes_local_score_bounds(monkeypatch, value, expected):
-    monkeypatch.delenv("VEILROUTE_CLOUD_API_KEY", raising=False)
-    monkeypatch.delenv("VEILROUTE_CLOUD_ENDPOINT", raising=False)
+    monkeypatch.delenv("VEILROUTER_CLOUD_API_KEY", raising=False)
+    monkeypatch.delenv("VEILROUTER_CLOUD_ENDPOINT", raising=False)
 
     config = RouterConfig(local_score_max=value)
 
@@ -63,4 +75,4 @@ def test_model_spec_preserves_public_fields():
     [ConfigurationError, ProviderSetupError, ProviderCallError, ScoreParseError, LocalContextExceededError],
 )
 def test_package_errors_share_common_base_type(error_type):
-    assert issubclass(error_type, VeilrouteError)
+    assert issubclass(error_type, VeilrouterError)

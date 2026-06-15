@@ -4,8 +4,8 @@ import copy
 from dataclasses import dataclass, field
 from typing import Any
 
-from veilroute.pii.detector import RegexPiiDetector, Span
-from veilroute.pii.placeholders import PlaceholderFactory, category_label, is_placeholder
+from veilrouter.pii.detector import RegexPiiDetector, Span
+from veilrouter.pii.placeholders import PlaceholderFactory, category_label, is_placeholder
 
 
 @dataclass(slots=True)

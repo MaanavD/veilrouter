@@ -2,12 +2,12 @@ import asyncio
 
 import pytest
 
-from veilroute.config import RouterConfig
-from veilroute.errors import LocalContextExceededError, ProviderCallError
-from veilroute.pii.detector import Span
-from veilroute.providers.base import ChatChunk, ChatResponse
-from veilroute.router import AsyncRouter, Router, flatten_messages, normalize_messages
-from veilroute.telemetry.recorder import InMemoryTelemetryRecorder
+from veilrouter.config import RouterConfig
+from veilrouter.errors import LocalContextExceededError, ProviderCallError
+from veilrouter.pii.detector import Span
+from veilrouter.providers.base import ChatChunk, ChatResponse
+from veilrouter.router import AsyncRouter, Router, flatten_messages, normalize_messages
+from veilrouter.telemetry.recorder import InMemoryTelemetryRecorder
 
 
 class StaticScorer:
